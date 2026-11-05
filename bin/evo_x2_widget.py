@@ -42,22 +42,50 @@ class Api:
 
     def __init__(self):
         self.win = None
+        self.pinned = False
+        self.nswindow = None
 
     def set_interval(self, seconds):
         core.CFG["interval"] = int(seconds)
         core.CFG["restart"] = True
 
+    def _apply_level(self):
+        import AppKit
+        import Quartz
+        if self.nswindow is None:
+            return
+        if self.pinned:
+            level = AppKit.NSStatusWindowLevel
+            behavior = self.nswindow.collectionBehavior() & ~AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
+        else:  # desktop-widget layer: below all app windows, like native widgets
+            level = Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)
+            behavior = (AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
+                        | AppKit.NSWindowCollectionBehaviorIgnoresCycle)
+        self.nswindow.setLevel_(level)
+        self.nswindow.setCollectionBehavior_(behavior)
+
     def toggle_pin(self):
-        self.win.on_top = not self.win.on_top
-        save_conf(pin=self.win.on_top)
-        return self.win.on_top
+        self.pinned = not self.pinned
+        self._apply_level()
+        save_conf(pin=self.pinned)
+        return self.pinned
 
     def get_pin(self):
-        return bool(self.win.on_top)
+        return self.pinned
 
     def quit(self):
         from AppKit import NSApplication  # pyobjc ships with pywebview
         NSApplication.sharedApplication().terminate_(None)
+
+
+def get_ns_window(win):
+    """Reach the real NSWindow through pywebview's cocoa internals."""
+    try:
+        from webview.platforms import cocoa
+        view = cocoa.BrowserView.instances.get(win.uid)
+        return getattr(view, "window", None)
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def main():
@@ -70,10 +98,23 @@ def main():
         "EVO-X2", f"http://127.0.0.1:{core.PORT}/?widget=1",
         width=conf.get("w", 820), height=conf.get("h", min(sh - 70, 1160)),
         x=conf.get("x"), y=conf.get("y"),
-        frameless=True, on_top=conf.get("pin", False), resizable=True,
+        frameless=True, on_top=False, resizable=True,
         easy_drag=True,
         background_color="#0d1117", js_api=api)
     api.win = win
+    api.pinned = bool(conf.get("pin", False))
+
+    def promote_to_desktop_widget():
+        # no Dock icon, no Cmd-Tab; unpinned it sits on the desktop layer
+        # below all app windows, like a real macOS widget
+        import AppKit
+        AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
+        nsw = get_ns_window(win)
+        if nsw is not None:
+            api.nswindow = nsw
+            api._apply_level()
+
+    win.events.loaded += promote_to_desktop_widget
 
     def remember():
         try:
