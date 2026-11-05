@@ -11,6 +11,18 @@ v1 working — live dashboard in [`bin/`](bin/), design in [docs/PROPOSAL.md](do
 ./bin/evo_x2_monitor.py            # 2 s live refresh; --once for a single snapshot
 ```
 
+## Menu-bar widget (macOS)
+
+Lives in the menu bar: `67° · 12% · 89%` (CPU temp · CPU % · RAM %).
+Dropdown = full details, **refresh-every picker (1–300 s)**, dashboard launcher.
+Dashboard at `http://127.0.0.1:8765/` = gauges, 32-core bars, rolling history graphs.
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install rumps   # once
+python3 bin/make_app.py                                # builds build/EVO X2 Monitor.app
+open "build/EVO X2 Monitor.app"                        # or drag to /Applications
+```
+
 ## Connect
 
 ```bash
