@@ -28,8 +28,7 @@
   .pill.on { color:var(--ok); border-color:#238636 } .pill.off{ color:var(--bad); border-color:var(--bad) }
   .wctl{ display:none; margin-left:auto; position:relative; gap:4px }
   body.widget .wctl { display:inline-flex }
-  body.widget h1 { -webkit-app-region:drag; user-select:none; padding:10px 12px;
-      margin:-20px -24px 14px; background:#161b22; border-bottom:1px solid var(--line) }
+  body.widget h1 { user-select:none }
   .wctl button { -webkit-app-region:no-drag; background:var(--card); color:var(--dim);
       border:1px solid var(--line); border-radius:6px; min-width:26px; height:24px;
       cursor:pointer; font-size:13px }
@@ -44,6 +43,24 @@
          transition:height .3s }
   .bar.w { background:var(--warn) } .bar.b { background:var(--bad) }
   .bar.z { background:#21262d; min-height:2px }
+
+  /* ---- compact macOS-widget look (only inside the frameless widget) ---- */
+  html { background:transparent }
+  body.widget { background:rgba(13,17,23,.93); border-radius:16px; padding:0;
+      overflow:hidden; display:flex; flex-direction:column;
+      border:1px solid rgba(255,255,255,.08); }
+  body.widget h1 { margin:0; padding:10px 12px; background:transparent; border-bottom:1px solid var(--line);
+      font-size:13px; display:flex; align-items:center; flex-wrap:wrap; gap:4px }
+  body.widget .grid { grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px 12px;
+      overflow-y:auto; flex:1 }
+  body.widget .card { border:none; border-radius:12px; background:rgba(22,27,34,.85); padding:8px 10px }
+  body.widget .card.wide, body.widget #cores { grid-column:1/-1; min-width:0 }
+  body.widget .big { font-size:18px } body.widget .unit { font-size:11px }
+  body.widget .sub { font-size:10px; margin-top:0 }
+  body.widget .card h2 { font-size:9px; margin-bottom:2px }
+  body.widget svg[viewBox] { max-height:78px }
+  body.widget .bar-row { height:36px }
+  body.widget canvas[height="70"] { height:44px }
 </style>
 </head>
 <body>

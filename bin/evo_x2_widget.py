@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""EVO-X2 desktop widget — a floating frameless panel on the macOS desktop.
+"""EVO-X2 desktop widget — a macOS-style widget on the desktop.
 
-No menu bar, no Dock icon: just the live dashboard in a compact draggable
-window that sits BEHIND your apps like a real desktop widget. Header strip:
+Rounded translucent card that lives just BELOW normal app windows (above the
+desktop, below everything you open), follows you across Spaces, no Dock icon,
+no Cmd-Tab entry. Drag it anywhere; position/size/pin/refresh-rate survive
+restarts (~/.evo-x2-widget.json). Header strip:
 ⟳ refresh-rate picker · 📌 float above everything · × quit.
-Position, size and pin survive restarts (~/.evo-x2-widget.json).
 
     .venv/bin/python bin/evo_x2_widget.py
 
@@ -46,8 +47,10 @@ class Api:
         self.nswindow = None
 
     def set_interval(self, seconds):
-        core.CFG["interval"] = int(seconds)
+        seconds = int(seconds)
+        core.CFG["interval"] = seconds
         core.CFG["restart"] = True
+        save_conf(interval=seconds)
 
     def _apply_level(self):
         import AppKit
@@ -57,8 +60,12 @@ class Api:
         if self.pinned:
             level = AppKit.NSStatusWindowLevel
             behavior = self.nswindow.collectionBehavior() & ~AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
-        else:  # desktop-widget layer: below all app windows, like native widgets
-            level = Quartz.CGWindowLevelForKey(Quartz.kCGDesktopIconWindowLevelKey)
+        else:
+            # One level BELOW normal windows: above the desktop/Finder layer
+            # (so it still receives mouse events — the desktop-icon layer is
+            # covered by Finder's own window and swallows clicks), below every
+            # app window, like a real macOS desktop widget.
+            level = Quartz.CGWindowLevelForKey(Quartz.kCGNormalWindowLevelKey) - 1
             behavior = (AppKit.NSWindowCollectionBehaviorCanJoinAllSpaces
                         | AppKit.NSWindowCollectionBehaviorIgnoresCycle)
         self.nswindow.setLevel_(level)
@@ -90,29 +97,32 @@ def get_ns_window(win):
 
 def main():
     conf = load_conf()
-    from AppKit import NSScreen  # default height: as tall as the screen allows
-    sh = int(NSScreen.mainScreen().frame().size.height)
+    from AppKit import NSScreen
+    screen = NSScreen.mainScreen().frame()
+    sw, sh = int(screen.size.width), int(screen.size.height)
+    core.CFG["interval"] = int(conf.get("interval", core.CFG.get("interval", 2)))
     api = Api()
     core.start()
     win = webview.create_window(
         "EVO-X2", f"http://127.0.0.1:{core.PORT}/?widget=1",
-        width=conf.get("w", 820), height=conf.get("h", min(sh - 70, 1160)),
-        x=conf.get("x"), y=conf.get("y"),
+        width=conf.get("w", 400), height=conf.get("h", min(sh - 140, 860)),
+        x=conf.get("x", sw - 400 - 50), y=conf.get("y", 60),
         frameless=True, on_top=False, resizable=True,
-        easy_drag=True,
-        background_color="#0d1117", js_api=api)
+        easy_drag=True, transparent=True, js_api=api)
     api.win = win
     api.pinned = bool(conf.get("pin", False))
 
     def promote_to_desktop_widget():
-        # no Dock icon, no Cmd-Tab; unpinned it sits on the desktop layer
-        # below all app windows, like a real macOS widget
+        # no Dock icon, no Cmd-Tab; unpinned it sits just below all app
+        # windows, like a real macOS desktop widget
         import AppKit
         AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
         nsw = get_ns_window(win)
         if nsw is not None:
             api.nswindow = nsw
             api._apply_level()
+            nsw.setOpaque_(False)
+            nsw.setBackgroundColor_(AppKit.NSColor.clearColor())
 
     win.events.loaded += promote_to_desktop_widget
 
