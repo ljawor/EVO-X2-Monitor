@@ -151,6 +151,10 @@ const RATES = [1,2,5,10,30,60,300];
       e.target.style.opacity = on ? 1 : 0.35;
   };
   document.getElementById('x').onclick = async () => { const a = api(); if (a) await a.quit(); };
+  (function pinInit(tries){ const a = api();
+    if (a) a.get_pin().then(on => { document.getElementById('pin').style.opacity = on ? 1 : 0.35; });
+    else if (tries > 0) setTimeout(() => pinInit(tries - 1), 300);
+  })(20);
 }
 
 async function tick(){

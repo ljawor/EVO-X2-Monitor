@@ -2,7 +2,8 @@
 """EVO-X2 desktop widget — a floating frameless panel on the macOS desktop.
 
 No menu bar, no Dock icon: just the live dashboard in a compact draggable
-window. Header strip: ⟳ refresh-rate picker · 📌 pin on top · × quit.
+window that sits BEHIND your apps like a real desktop widget. Header strip:
+⟳ refresh-rate picker · 📌 float above everything · × quit.
 Position, size and pin survive restarts (~/.evo-x2-widget.json).
 
     .venv/bin/python bin/evo_x2_widget.py
@@ -51,6 +52,9 @@ class Api:
         save_conf(pin=self.win.on_top)
         return self.win.on_top
 
+    def get_pin(self):
+        return bool(self.win.on_top)
+
     def quit(self):
         from AppKit import NSApplication  # pyobjc ships with pywebview
         NSApplication.sharedApplication().terminate_(None)
@@ -58,13 +62,15 @@ class Api:
 
 def main():
     conf = load_conf()
+    from AppKit import NSScreen  # default height: as tall as the screen allows
+    sh = int(NSScreen.mainScreen().frame().size.height)
     api = Api()
     core.start()
     win = webview.create_window(
         "EVO-X2", f"http://127.0.0.1:{core.PORT}/?widget=1",
-        width=conf.get("w", 780), height=conf.get("h", 920),
+        width=conf.get("w", 820), height=conf.get("h", min(sh - 70, 1160)),
         x=conf.get("x"), y=conf.get("y"),
-        frameless=True, on_top=conf.get("pin", True), resizable=True,
+        frameless=True, on_top=conf.get("pin", False), resizable=True,
         easy_drag=True,
         background_color="#0d1117", js_api=api)
     api.win = win
