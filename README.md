@@ -5,7 +5,11 @@ Ubuntu 24.04) fired from the Mac over SSH.
 
 ## Status
 
-Design phase — see [docs/PROPOSAL.md](docs/PROPOSAL.md).
+v1 working — live dashboard in [`bin/`](bin/), design in [docs/PROPOSAL.md](docs/PROPOSAL.md).
+
+```bash
+./bin/evo_x2_monitor.py            # 2 s live refresh; --once for a single snapshot
+```
 
 ## Connect
 
