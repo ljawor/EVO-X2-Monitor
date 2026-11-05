@@ -8,8 +8,9 @@
   :root { --bg:#0d1117; --card:#161b22; --line:#21262d; --txt:#e6edf3; --dim:#8b949e;
           --ok:#3fb950; --warn:#d29922; --bad:#f85149; --acc:#58a6ff; --mag:#bc8cff; }
   * { box-sizing:border-box; margin:0 }
-  body { background:var(--bg); color:var(--txt);
+  body { background:var(--bg); color:var(--txt); overflow-y:auto;
          font:14px/1.4 ui-monospace,"SF Mono",Menlo,monospace; padding:18px; }
+  ::-webkit-scrollbar { width:10px } ::-webkit-scrollbar-thumb { background:#30363d; border-radius:5px }
   h1 { font-size:15px; font-weight:600; letter-spacing:.5px; margin-bottom:14px }
   h1 .dot { color:var(--ok) } h1 .dim { color:var(--dim); font-weight:400 }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px }
@@ -76,11 +77,11 @@ const $=id=>document.getElementById(id);
 const col=v=>v<70?'var(--ok)':v<90?'var(--warn)':'var(--bad)';
 const colx=v=>v<80?'#3fb950':v<90?'#d29922':'#f85149';
 
-function gauge(svg,pct,color){ // half-donut 0..100
+function gauge(svg,pct,color){ // half-donut 0..100 — sweep never exceeds 180°, so the SVG large-arc flag is always 0
   const r=78,cx=105,cy=100,a0=Math.PI,a1=Math.PI*2;
   const pt=a=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
-  const arc=(f,to)=>{const[x1,y1]=pt(a0),[x2,y2]=pt(a0+(a1-a0)*f);
-    return `M${x1} ${y1}A${r} ${r} 0 ${f>.5?1:0} 1 ${x2} ${y2}`};
+  const arc=(f)=>{f=Math.min(f,0.9995);const[x1,y1]=pt(a0),[x2,y2]=pt(a0+(a1-a0)*f);
+    return `M${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}`};
   $(svg).innerHTML=`<path d="${arc(1)}" stroke="#21262d" stroke-width="14" fill="none" stroke-linecap="round"/>`+
     (pct>0?`<path d="${arc(Math.max(.01,pct/100))}" stroke="${color}" stroke-width="14" fill="none" stroke-linecap="round"/>`:'');
 }
@@ -143,7 +144,12 @@ const RATES = [1,2,5,10,30,60,300];
       const a = api(); if (a) await a.set_interval(+b.dataset.s);
       pop.classList.remove('show');
   });
-  document.getElementById('pin').onclick = async () => { const a = api(); if (a) await a.toggle_pin(); };
+  document.getElementById('pin').onclick = async (e) => {
+      const a = api();
+      if (!a) { document.getElementById('meta').textContent = 'bridge not ready — press ×, relaunch'; return; }
+      const on = await a.toggle_pin();
+      e.target.style.opacity = on ? 1 : 0.35;
+  };
   document.getElementById('x').onclick = async () => { const a = api(); if (a) await a.quit(); };
 }
 

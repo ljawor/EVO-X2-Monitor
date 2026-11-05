@@ -65,7 +65,8 @@ def main():
         width=conf.get("w", 780), height=conf.get("h", 920),
         x=conf.get("x"), y=conf.get("y"),
         frameless=True, on_top=conf.get("pin", True), resizable=True,
-        background_color="#0d1117", js_api=api, easy_drag=False)
+        easy_drag=True,
+        background_color="#0d1117", js_api=api)
     api.win = win
 
     def remember():
