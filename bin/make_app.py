@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build EVO X2 Monitor.app — double-clickable menu-bar app from this repo.
+"""Build EVO X2 Monitor.app — double-clickable desktop widget from this repo.
 
 Writes build/EVO X2 Monitor.app whose launcher calls this repo's venv,
 so `git pull` updates the app in place. Then:
@@ -39,7 +39,7 @@ touch(os.path.join(APP, "Contents/Info.plist"), PLIST)
 launcher = (
     "#!/bin/sh\n"
     f'exec "{os.path.join(ROOT, ".venv", "bin", "python")}" '
-    f'"{os.path.join(ROOT, "bin", "evo_x2_menubar.py")}"\n'
+    f'"{os.path.join(ROOT, "bin", "evo_x2_widget.py")}"\n'
 )
 touch(os.path.join(APP, "Contents/MacOS/EVO X2 Monitor"),
       launcher, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)

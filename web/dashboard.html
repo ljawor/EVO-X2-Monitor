@@ -25,6 +25,18 @@
   .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px;
           border:1px solid var(--line); color:var(--dim) }
   .pill.on { color:var(--ok); border-color:#238636 } .pill.off{ color:var(--bad); border-color:var(--bad) }
+  .wctl{ display:none; margin-left:auto; position:relative; gap:4px }
+  body.widget .wctl { display:inline-flex }
+  body.widget h1 { -webkit-app-region:drag; user-select:none; padding:10px 12px;
+      margin:-20px -24px 14px; background:#161b22; border-bottom:1px solid var(--line) }
+  .wctl button { -webkit-app-region:no-drag; background:var(--card); color:var(--dim);
+      border:1px solid var(--line); border-radius:6px; min-width:26px; height:24px;
+      cursor:pointer; font-size:13px }
+  .wctl button:hover { color:var(--txt) }
+  .ratepop { display:none; position:absolute; right:0; top:30px; background:var(--card);
+      border:1px solid var(--line); border-radius:8px; padding:6px; z-index:9; gap:4px }
+  .ratepop.show { display:flex }
+  .ratepop .on { color:var(--acc); border-color:var(--acc) }
   #cores { grid-column:1/-1 }
   .bar-row { display:flex; gap:2px; align-items:flex-end; height:56px; margin-top:8px }
   .bar { flex:1; background:var(--ok); border-radius:2px 2px 0 0; min-height:2px;
@@ -34,8 +46,11 @@
 </style>
 </head>
 <body>
-<h1><span class="dot">●</span> EVO-X2 <span class="dim" id="meta">connecting…</span>
-    <span id="llama" class="pill">llama-server</span></h1>
+<h1 id="hdr"><span class="dot">●</span> EVO-X2 <span class="dim" id="meta">connecting…</span>
+    <span id="llama" class="pill">llama-server</span>
+    <span id="wctl" class="wctl">
+      <button id="rate" title="refresh rate">⟳</button><button id="pin" title="pin on top">📌</button><button id="x" title="quit">×</button>
+      <span id="ratepop" class="ratepop"></span></span></h1>
 <div class="grid">
   <div class="card"><h2>CPU</h2><div class="big" id="cpuV">—</div>
     <div class="sub" id="cpuS"></div><svg id="gCpu" viewBox="0 0 210 118"></svg></div>
@@ -82,6 +97,7 @@ function spark(cv,series,opts){opts=opts||{};
 const hist={cpu:[],gpu:[],ct:[],ram:[],dio:[]};
 function render(s){
   $('meta').textContent=`refresh ${last.interval}s · up ${fmtUp(s.uptime_s)} · load ${s.load1.toFixed(2)}`;
+  $('meta').dataset.i = last.interval;
   const lp=$('llama');lp.textContent='llama-server '+s.llama;
   lp.className='pill '+(s.llama==='active'?'on':'off');
   const cpu=s.cpu_pct.cpu||0;
@@ -111,7 +127,27 @@ function render(s){
 }
 const fmtUp=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+h+'h '+m+'m'};
 let last={interval:2};
-async function poll(){
+const WIDGET = new URLSearchParams(location.search).has('widget');
+if (WIDGET) document.body.classList.add('widget');
+const api = () => (window.pywebview && window.pywebview.api) || null;
+const RATES = [1,2,5,10,30,60,300];
+{
+  const pop = document.getElementById('ratepop');
+  pop.innerHTML = RATES.map(s=>`<button data-s="${s}">${s}s</button>`).join('');
+  document.getElementById('rate').onclick = () => {
+      pop.classList.toggle('show');
+      const cur = +(document.getElementById('meta').dataset.i || 2);
+      pop.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.s === cur));
+  };
+  pop.querySelectorAll('button').forEach(b => b.onclick = async () => {
+      const a = api(); if (a) await a.set_interval(+b.dataset.s);
+      pop.classList.remove('show');
+  });
+  document.getElementById('pin').onclick = async () => { const a = api(); if (a) await a.toggle_pin(); };
+  document.getElementById('x').onclick = async () => { const a = api(); if (a) await a.quit(); };
+}
+
+async function tick(){
   try{
     const r=await fetch('/history.json');const j=await r.json();last=j;
     const h=j.history,s=h[h.length-1];
@@ -120,9 +156,9 @@ async function poll(){
     hist.dio=h.map(x=>((x.io.nvme0n1||[0,0])[0]+(x.io.nvme0n1||[0,0])[1])/2**20);
     if(s)render(s);
   }catch(e){$('meta').textContent='widget not running — start bin/evo_x2_menubar.py'}
-  setTimeout(poll,last.interval*1000);
+  setTimeout(tick,last.interval*1000);
 }
-poll();
+tick();
 </script>
 </body>
 </html>
