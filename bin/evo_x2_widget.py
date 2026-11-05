@@ -96,6 +96,11 @@ def get_ns_window(win):
 
 
 def main():
+    import socket
+    with socket.socket() as s:  # single instance: the shortcut is safe to spam
+        if s.connect_ex(("127.0.0.1", core.PORT)) == 0:
+            print("EVO-X2 widget is already running")
+            return
     conf = load_conf()
     from AppKit import NSScreen
     screen = NSScreen.mainScreen().frame()
@@ -127,13 +132,44 @@ def main():
     win.events.loaded += promote_to_desktop_widget
 
     def remember():
+        # pywebview has no get_positions() in this version; read the NSWindow.
+        # Cocoa origin is bottom-left; conf stores top-left like create_window.
         try:
-            x, y, w, h = win.get_positions()
-            save_conf(x=x, y=y, w=w, h=h)
+            nsw = api.nswindow or get_ns_window(win)
+            if nsw is None:
+                return
+            f = nsw.frame()
+            sh = NSScreen.mainScreen().frame().size.height
+            save_conf(x=int(f.origin.x), y=int(sh - f.origin.y - f.size.height),
+                      w=int(f.size.width), h=int(f.size.height))
         except Exception:  # noqa: BLE001 — geometry save is best-effort
             pass
 
     win.events.closed += remember
+
+    # The × button hard-terminates the app (no closed handler runs), so keep
+    # geometry fresh in conf from a daemon thread instead.
+    import threading
+    import time as _t
+
+    def autosave():
+        last = None
+        while True:
+            _t.sleep(5)
+            try:
+                if api.nswindow is None:
+                    continue
+                f = api.nswindow.frame()
+                sh = NSScreen.mainScreen().frame().size.height
+                geo = dict(x=int(f.origin.x), y=int(sh - f.origin.y - f.size.height),
+                           w=int(f.size.width), h=int(f.size.height))
+                if geo != last:
+                    save_conf(**geo)
+                    last = geo
+            except Exception:  # noqa: BLE001
+                pass
+
+    threading.Thread(target=autosave, daemon=True).start()
     webview.start()
 
 
