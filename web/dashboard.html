@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EVO-X2 Monitor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --line:#21262d; --txt:#e6edf3; --dim:#8b949e;
+          --ok:#3fb950; --warn:#d29922; --bad:#f85149; --acc:#58a6ff; --mag:#bc8cff; }
+  * { box-sizing:border-box; margin:0 }
+  body { background:var(--bg); color:var(--txt); overflow-y:auto;
+         font:14px/1.4 ui-monospace,"SF Mono",Menlo,monospace; padding:18px; }
+  ::-webkit-scrollbar { width:10px } ::-webkit-scrollbar-thumb { background:#30363d; border-radius:5px }
+  h1 { font-size:15px; font-weight:600; letter-spacing:.5px; margin-bottom:14px }
+  h1 .dot { color:var(--ok) } h1 .dim { color:var(--dim); font-weight:400 }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:12px 14px }
+  .card h2 { font-size:11px; color:var(--dim); font-weight:600; letter-spacing:1px;
+             text-transform:uppercase; margin-bottom:6px }
+  .big { font-size:26px; font-weight:700 } .unit{font-size:13px;color:var(--dim)}
+  .sub { font-size:12px; color:var(--dim); margin-top:2px }
+  canvas { display:block; width:100%; }
+  .wide { grid-column:1/-1 }
+  svg text { font-family:inherit }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:12px;
+          border:1px solid var(--line); color:var(--dim) }
+  .pill.on { color:var(--ok); border-color:#238636 } .pill.off{ color:var(--bad); border-color:var(--bad) }
+  .wctl{ display:none; margin-left:auto; position:relative; gap:4px }
+  body.widget .wctl { display:inline-flex }
+  body.widget h1 { user-select:none }
+  .wctl button { -webkit-app-region:no-drag; background:var(--card); color:var(--dim);
+      border:1px solid var(--line); border-radius:6px; min-width:26px; height:24px;
+      cursor:pointer; font-size:13px }
+  .wctl button:hover { color:var(--txt) }
+  .ratepop { display:none; position:absolute; right:0; top:30px; background:var(--card);
+      border:1px solid var(--line); border-radius:8px; padding:6px; z-index:9; gap:4px }
+  .ratepop.show { display:flex }
+  .ratepop .on { color:var(--acc); border-color:var(--acc) }
+  #cores { grid-column:1/-1 }
+  .bar-row { display:flex; gap:2px; align-items:flex-end; height:56px; margin-top:8px }
+  .bar { flex:1; background:var(--ok); border-radius:2px 2px 0 0; min-height:2px;
+         transition:height .3s }
+  .bar.w { background:var(--warn) } .bar.b { background:var(--bad) }
+  .bar.z { background:#21262d; min-height:2px }
+
+  /* ---- compact macOS-widget look (only inside the frameless widget) ---- */
+  html { background:transparent }
+  body.widget { background:rgba(13,17,23,.38); border-radius:16px; padding:0;
+      overflow:hidden; display:flex; flex-direction:column;
+      border:1px solid rgba(255,255,255,.08); }
+  body.widget h1 { margin:0; padding:10px 12px; background:transparent; border-bottom:1px solid var(--line);
+      font-size:13px; display:flex; align-items:center; flex-wrap:wrap; gap:4px }
+  body.widget .grid { grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px 12px;
+      overflow-y:auto; flex:1 }
+  body.widget .card { border:none; border-radius:12px; background:rgba(22,27,34,.45); padding:8px 10px }
+  body.widget .card.wide, body.widget #cores { grid-column:1/-1; min-width:0 }
+  body.widget .big { font-size:18px } body.widget .unit { font-size:11px }
+  body.widget .sub { font-size:10px; margin-top:0 }
+  body.widget .card h2 { font-size:9px; margin-bottom:2px }
+  body.widget svg[viewBox] { max-height:78px }
+  body.widget .bar-row { height:36px }
+  body.widget canvas[height="70"] { height:44px }
+</style>
+</head>
+<body>
+<h1 id="hdr"><span class="dot">●</span> EVO-X2 <span class="dim" id="meta">connecting…</span>
+    <span id="llama" class="pill">llama-server</span>
+    <span id="wctl" class="wctl">
+      <button id="rate" title="refresh rate">⟳</button><button id="pin" title="pin on top">📌</button><button id="x" title="quit">×</button>
+      <span id="ratepop" class="ratepop"></span></span></h1>
+<div class="grid">
+  <div class="card"><h2>CPU</h2><div class="big" id="cpuV">—</div>
+    <div class="sub" id="cpuS"></div><svg id="gCpu" viewBox="0 0 210 118"></svg></div>
+  <div class="card"><h2>CPU temp</h2><div class="big" id="ctV">—</div>
+    <div class="sub">k10temp Tctl · 80/90 °C thresholds</div>
+    <svg id="gCt" viewBox="0 0 210 118"></svg></div>
+  <div class="card"><h2>GPU (Radeon 8060S)</h2><div class="big" id="gpuV">—</div>
+    <div class="sub" id="gpuS"></div><svg id="gGpu" viewBox="0 0 210 118"></svg></div>
+  <div class="card"><h2>GPU temp</h2><div class="big" id="gtV">—</div>
+    <div class="sub">amdgpu edge</div><svg id="gGt" viewBox="0 0 210 118"></svg></div>
+  <div class="card wide" style="grid-column:span 2;min-width:420px">
+    <h2>RAM · model memory</h2><div class="big" id="ramV">—</div>
+    <div class="sub" id="ramS"></div><canvas id="cRam" height="70"></canvas></div>
+  <div class="card wide" style="grid-column:span 2;min-width:420px">
+    <h2>Disk / SSD</h2><div class="big" id="dskV">—</div>
+    <div class="sub" id="dskS"></div><canvas id="cDsk" height="70"></canvas></div>
+  <div class="card" id="cores"><h2>Per-core load · 32 cores</h2><div class="bar-row" id="coreBars"></div></div>
+  <div class="card wide"><h2>History · CPU % (green) · GPU % (purple) · CPU °C (amber)</h2>
+    <canvas id="cHist" height="150"></canvas></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const col=v=>v<70?'var(--ok)':v<90?'var(--warn)':'var(--bad)';
+const colx=v=>v<80?'#3fb950':v<90?'#d29922':'#f85149';
+
+function gauge(svg,pct,color){ // half-donut 0..100 — sweep never exceeds 180°, so the SVG large-arc flag is always 0
+  const r=78,cx=105,cy=100,a0=Math.PI,a1=Math.PI*2;
+  const pt=a=>[cx+r*Math.cos(a),cy+r*Math.sin(a)];
+  const arc=(f)=>{f=Math.min(f,0.9995);const[x1,y1]=pt(a0),[x2,y2]=pt(a0+(a1-a0)*f);
+    return `M${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}`};
+  $(svg).innerHTML=`<path d="${arc(1)}" stroke="#21262d" stroke-width="14" fill="none" stroke-linecap="round"/>`+
+    (pct>0?`<path d="${arc(Math.max(.01,pct/100))}" stroke="${color}" stroke-width="14" fill="none" stroke-linecap="round"/>`:'');
+}
+function spark(cv,series,opts){opts=opts||{};
+  const w=cv.width=cv.clientWidth*devicePixelRatio,h=cv.height=(opts.h||70)*devicePixelRatio;
+  const x=cv.getContext('2d');x.clearRect(0,0,w,h);
+  const n=Math.max(series.length?series.map(s=>s.v.length).reduce((a,b)=>Math.max(a,b)):0,2);
+  const max=opts.max||Math.max(1,...series.flatMap(s=>s.v));
+  x.lineWidth=2*devicePixelRatio;
+  series.forEach(s=>{x.strokeStyle=s.c;x.beginPath();
+    s.v.forEach((v,i)=>{const px=i/(n-1)*w,py=h-6-(v/max)*(h-12);
+      i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();});
+}
+const hist={cpu:[],gpu:[],ct:[],ram:[],dio:[]};
+function render(s){
+  $('meta').textContent=`refresh ${last.interval}s · up ${fmtUp(s.uptime_s)} · load ${s.load1.toFixed(2)}`;
+  $('meta').dataset.i = last.interval;
+  const lp=$('llama');lp.textContent='llama-server '+s.llama;
+  lp.className='pill '+(s.llama==='active'?'on':'off');
+  const cpu=s.cpu_pct.cpu||0;
+  $('cpuV').innerHTML=cpu.toFixed(0)+'<span class="unit"> %</span>';
+  $('cpuS').textContent='aggregate of 32 cores';gauge('gCpu',cpu,col(cpu));
+  const ct=s.cpu_temp/1000;
+  $('ctV').innerHTML=ct.toFixed(1)+'<span class="unit"> °C</span>';gauge('gCt',ct*100/100,colx(ct));
+  $('gpuV').innerHTML=s.gpu_busy+'<span class="unit"> %</span>';
+  $('gpuS').textContent='VRAM '+(s.vram_used/2**30).toFixed(1)+'/'+(s.vram_total/2**30).toFixed(1)+' G';
+  gauge('gGpu',s.gpu_busy,s.gpu_busy<70?'#bc8cff':col(s.gpu_busy));
+  const gt=s.gpu_temp/1000;
+  $('gtV').innerHTML=gt.toFixed(1)+'<span class="unit"> °C</span>';gauge('gGt',gt,colx(gt));
+  const mu=(s.mem_total_kib-s.mem_avail_kib)/2**20,mt=s.mem_total_kib/2**20;
+  $('ramV').innerHTML=mu.toFixed(1)+'<span class="unit"> / '+mt.toFixed(0)+' G used</span>';
+  $('ramS').textContent='free '+(s.mem_avail_kib/2**20).toFixed(1)+' G · model budget ~124 G';
+  const du=100*(s.disk_total-s.disk_free)/s.disk_total,dio=s.io.nvme0n1||[0,0];
+  const nt=s.nvme_temp/1000;
+  $('dskV').innerHTML=du.toFixed(0)+'<span class="unit"> % used · '+nt.toFixed(0)+' °C</span>';
+  $('dskS').textContent='read '+(dio[0]/2**20).toFixed(1)+' MB/s · write '+(dio[1]/2**20).toFixed(1)+' MB/s';
+  // cores
+  const cores=Object.keys(s.cpu_pct).filter(k=>k!=='cpu').map(k=>s.cpu_pct[k]);
+  $('coreBars').innerHTML=cores.map(v=>`<div class="${v<70?'bar':v<90?'bar w':'bar b'}" style="height:${Math.max(2,v)}%" title="${v.toFixed(0)}%"></div>`).join('');
+  // sparks
+  spark($('cRam'),[{v:hist.ram,c:'#58a6ff'}],{max:mt});
+  spark($('cDsk'),[{v:hist.dio,c:'#f0883e'}],{max:200});
+  spark($('cHist'),[{v:hist.cpu,c:'#3fb950'},{v:hist.gpu,c:'#bc8cff'},{v:hist.ct.map(x=>x*100/100),c:'#d29922'}],{max:100,h:150});
+}
+const fmtUp=s=>{const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+h+'h '+m+'m'};
+let last={interval:2};
+const WIDGET = new URLSearchParams(location.search).has('widget');
+if (WIDGET) document.body.classList.add('widget');
+const api = () => (window.pywebview && window.pywebview.api) || null;
+const RATES = [1,2,5,10,30,60,300];
+{
+  const pop = document.getElementById('ratepop');
+  pop.innerHTML = RATES.map(s=>`<button data-s="${s}">${s}s</button>`).join('');
+  document.getElementById('rate').onclick = () => {
+      pop.classList.toggle('show');
+      const cur = +(document.getElementById('meta').dataset.i || 2);
+      pop.querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.s === cur));
+  };
+  pop.querySelectorAll('button').forEach(b => b.onclick = async () => {
+      const a = api(); if (a) await a.set_interval(+b.dataset.s);
+      pop.classList.remove('show');
+  });
+  document.getElementById('pin').onclick = async (e) => {
+      const a = api();
+      if (!a) { document.getElementById('meta').textContent = 'bridge not ready — press ×, relaunch'; return; }
+      const on = await a.toggle_pin();
+      e.target.style.opacity = on ? 1 : 0.35;
+  };
+  document.getElementById('x').onclick = async () => { const a = api(); if (a) await a.quit(); };
+  (function pinInit(tries){ const a = api();
+    if (a) a.get_pin().then(on => { document.getElementById('pin').style.opacity = on ? 1 : 0.35; });
+    else if (tries > 0) setTimeout(() => pinInit(tries - 1), 300);
+  })(20);
+}
+
+async function tick(){
+  try{
+    const r=await fetch('/history.json');const j=await r.json();last=j;
+    const h=j.history,s=h[h.length-1];
+    hist.cpu=h.map(x=>x.cpu_pct.cpu||0);hist.gpu=h.map(x=>x.gpu_busy);
+    hist.ct=h.map(x=>x.cpu_temp/1000);hist.ram=h.map(x=>(x.mem_total_kib-x.mem_avail_kib)/2**20);
+    hist.dio=h.map(x=>((x.io.nvme0n1||[0,0])[0]+(x.io.nvme0n1||[0,0])[1])/2**20);
+    if(s)render(s);
+  }catch(e){$('meta').textContent='widget not running — start bin/evo_x2_menubar.py'}
+  setTimeout(tick,last.interval*1000);
+}
+tick();
+</script>
+</body>
+</html>

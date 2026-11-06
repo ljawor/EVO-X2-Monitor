@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.evox2.widget</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/lukaszjawor/NewGitHub/EVO-X2-Monitor/.venv/bin/python</string>
+        <string>/Users/lukaszjawor/NewGitHub/EVO-X2-Monitor/bin/evo_x2_widget.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/tmp/evox2-widget.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/evox2-widget.log</string>
+</dict>
+</plist>
