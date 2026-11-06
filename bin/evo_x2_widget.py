@@ -113,7 +113,7 @@ def main():
         width=conf.get("w", 400), height=conf.get("h", min(sh - 140, 860)),
         x=conf.get("x", sw - 400 - 50), y=conf.get("y", 60),
         frameless=True, on_top=False, resizable=True,
-        easy_drag=True, transparent=True, js_api=api)
+        easy_drag=True, transparent=True, vibrancy=True, js_api=api)
     api.win = win
     api.pinned = bool(conf.get("pin", False))
 
@@ -128,18 +128,31 @@ def main():
             api._apply_level()
             nsw.setOpaque_(False)
             nsw.setBackgroundColor_(AppKit.NSColor.clearColor())
+            # native-widget frosted glass: dark vibrancy material under the web view
+            nsw.setAppearance_(AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua"))
+
+            def _vibes(view):
+                for v in view.subviews():
+                    if v.isKindOfClass(AppKit.NSVisualEffectView):
+                        yield v
+                    yield from _vibes(v)
+
+            for v in _vibes(nsw.contentView()):
+                v.setMaterial_(AppKit.NSVisualEffectMaterialUnderWindowBackground)
 
     win.events.loaded += promote_to_desktop_widget
 
     def remember():
         # pywebview has no get_positions() in this version; read the NSWindow.
-        # Cocoa origin is bottom-left; conf stores top-left like create_window.
+        # Cocoa is bottom-left origin; conf stores CG-style top-left coords.
+        # Flip against screens()[0] (owns the global origin) — mainScreen is
+        # whichever display has key focus, wrong on multi-display setups.
         try:
             nsw = api.nswindow or get_ns_window(win)
             if nsw is None:
                 return
             f = nsw.frame()
-            sh = NSScreen.mainScreen().frame().size.height
+            sh = NSScreen.screens()[0].frame().size.height
             save_conf(x=int(f.origin.x), y=int(sh - f.origin.y - f.size.height),
                       w=int(f.size.width), h=int(f.size.height))
         except Exception:  # noqa: BLE001 — geometry save is best-effort
@@ -160,7 +173,7 @@ def main():
                 if api.nswindow is None:
                     continue
                 f = api.nswindow.frame()
-                sh = NSScreen.mainScreen().frame().size.height
+                sh = NSScreen.screens()[0].frame().size.height
                 geo = dict(x=int(f.origin.x), y=int(sh - f.origin.y - f.size.height),
                            w=int(f.size.width), h=int(f.size.height))
                 if geo != last:
