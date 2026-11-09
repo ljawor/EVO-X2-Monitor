@@ -123,22 +123,35 @@ def main():
         import AppKit
         AppKit.NSApp.setActivationPolicy_(AppKit.NSApplicationActivationPolicyAccessory)
         nsw = get_ns_window(win)
-        if nsw is not None:
-            api.nswindow = nsw
-            api._apply_level()
-            nsw.setOpaque_(False)
-            nsw.setBackgroundColor_(AppKit.NSColor.clearColor())
-            # native-widget frosted glass: dark vibrancy material under the web view
+        if nsw is None:
+            return
+        api.nswindow = nsw
+        api._apply_level()
+        nsw.setOpaque_(False)
+        nsw.setBackgroundColor_(AppKit.NSColor.clearColor())
+
+        # Native-widget frosted glass: dark vibrancy material under the web view.
+        # Best-effort ON PURPOSE. This is looks-only, so a pyobjc/pywebview change
+        # in the view tree must degrade to a plain translucent panel — never raise.
+        # An exception in a `loaded` handler tears down the whole app, and the
+        # LaunchAgent then respawns it into the same crash, forever.
+        try:
             nsw.setAppearance_(AppKit.NSAppearance.appearanceNamed_("NSAppearanceNameDarkAqua"))
 
             def _vibes(view):
                 for v in view.subviews():
-                    if v.isKindOfClass(AppKit.NSVisualEffectView):
+                    # pyobjc maps `isKindOfClass:` to `isKindOfClass_`, and older
+                    # releases omit it entirely; isinstance is the stable check.
+                    if isinstance(v, AppKit.NSVisualEffectView):
                         yield v
                     yield from _vibes(v)
 
-            for v in _vibes(nsw.contentView()):
+            views = list(_vibes(nsw.contentView()))
+            for v in views:
                 v.setMaterial_(AppKit.NSVisualEffectMaterialUnderWindowBackground)
+            print(f"frost applied to {len(views)} vibrancy view(s)", file=sys.stderr)
+        except Exception as exc:  # noqa: BLE001
+            print(f"frost unavailable, continuing without vibrancy: {exc}", file=sys.stderr)
 
     win.events.loaded += promote_to_desktop_widget
 
